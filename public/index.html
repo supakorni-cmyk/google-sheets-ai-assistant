@@ -3,14 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Assistant Dashboard</title>
+    <title>My AI Assistant Dashboard</title>
     <style>
-        body { font-family: system-ui, sans-serif; background: #f4f4f5; padding: 2rem; max-width: 800px; margin: 0 auto; }
-        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem; }
-        input { width: 70%; padding: 0.5rem; }
-        button { padding: 0.5rem 1rem; background: #10a37f; color: #fff; border: none; cursor: pointer; border-radius: 4px;}
+        body { font-family: system-ui, sans-serif; background: #f4f4f5; padding: 2rem; max-width: 800px; margin: 0 auto; color: #333; }
+        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 2rem; }
+        input[type="text"] { width: 70%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 6px; margin-right: 10px; }
+        button { padding: 0.75rem 1.5rem; background: #10a37f; color: #fff; border: none; cursor: pointer; border-radius: 6px; font-weight: bold; }
+        button:hover { background: #0d8a6b; }
         table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-        td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        td, th { border: 1px solid #eee; padding: 12px; text-align: left; }
+        th { background: #fafafa; }
     </style>
 </head>
 <body>
@@ -18,15 +20,21 @@
     <h1>🚀 My AI Command Center</h1>
 
     <div class="card">
-        <h2>📊 Latest Google Sheets Data</h2>
+        <h2>➕ Add New Task</h2>
+        <input type="text" id="newTaskInput" placeholder="Pay the electric bill...">
+        <button onclick="createTask()">Save Task</button>
+    </div>
+
+    <div class="card">
+        <h2>📊 Active Tasks & Data</h2>
         <div id="sheetContent">Loading data...</div>
     </div>
 
     <div class="card">
         <h2>🤖 Ask your Assistant</h2>
-        <input type="text" id="aiInput" placeholder="Analyze my expenses...">
+        <input type="text" id="aiInput" placeholder="Analyze my workload...">
         <button onclick="askAI()">Ask AI</button>
-        <p id="aiResponse"></p>
+        <p id="aiResponse" style="margin-top: 1rem; line-height: 1.5;"></p>
     </div>
 
     <script>
@@ -34,6 +42,11 @@
             const response = await fetch('/api?action=getSheetData');
             const data = await response.json();
             
+            if (data.length === 0) {
+                document.getElementById('sheetContent').innerHTML = "<p>No data found.</p>";
+                return;
+            }
+
             let html = '<table>';
             data.forEach((row, index) => {
                 html += '<tr>';
@@ -46,8 +59,29 @@
             document.getElementById('sheetContent').innerHTML = html;
         }
 
+        async function createTask() {
+            const taskInput = document.getElementById('newTaskInput');
+            const taskText = taskInput.value;
+            if (!taskText) return;
+
+            taskInput.value = 'Saving...';
+            taskInput.disabled = true;
+
+            await fetch('/api?action=createTask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ task: taskText })
+            });
+
+            taskInput.value = '';
+            taskInput.disabled = false;
+            fetchSheetData(); // Refresh table
+        }
+
         async function askAI() {
             const question = document.getElementById('aiInput').value;
+            if (!question) return;
+            
             const responseText = document.getElementById('aiResponse');
             responseText.innerHTML = "<em>Analyzing...</em>";
 
@@ -61,6 +95,7 @@
             responseText.innerHTML = `<strong>Assistant:</strong> ${data.answer}`;
         }
 
+        // Run on load
         fetchSheetData();
     </script>
 </body>

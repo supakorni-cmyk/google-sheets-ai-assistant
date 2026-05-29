@@ -15,27 +15,34 @@ export default async (req: Request, context: Context) => {
     const url = new URL(req.url);
     const spreadsheetId = process.env.GOOGLE_SHEET_ID || '';
     
+    // 1. GET DATA (Updated to include Row Numbers)
     if (url.searchParams.get("action") === "getSheetData") {
         const sheetData = await sheets.spreadsheets.values.get({
             spreadsheetId: spreadsheetId,
             range: 'Sheet1!A:D', 
         });
         
-        return new Response(JSON.stringify(sheetData.data.values || []), {
+        const rows = sheetData.data.values || [];
+        // Map data to include the exact Google Sheet row number
+        const rowsWithNumbers = rows.map((row, index) => ({
+            rowNumber: index + 1,
+            data: row
+        }));
+        
+        return new Response(JSON.stringify(rowsWithNumbers), {
             headers: { "Content-Type": "application/json" }
         });
     }
 
-   if (url.searchParams.get("action") === "createTask" && req.method === "POST") {
+    // 2. CREATE TASK
+    if (url.searchParams.get("action") === "createTask" && req.method === "POST") {
         const body = await req.json();
-        
-        // Get the current time in Thailand
         const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
         const deadline = body.deadline || "-";
 
         await sheets.spreadsheets.values.append({
             spreadsheetId: spreadsheetId,
-            range: 'Sheet1!A:D', // Expanded range to cover Columns A through D
+            range: 'Sheet1!A:D',
             valueInputOption: 'USER_ENTERED',
             requestBody: { values: [[body.task, 'Pending', now, deadline]] }
         });
@@ -45,14 +52,45 @@ export default async (req: Request, context: Context) => {
         });
     }
 
+    // 3. UPDATE STATUS (Mark Done / Pending)
+    if (url.searchParams.get("action") === "updateStatus" && req.method === "POST") {
+        const body = await req.json();
+        await sheets.spreadsheets.values.update({
+            spreadsheetId: spreadsheetId,
+            range: `Sheet1!B${body.rowNumber}`, // Update Column B
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: [[body.status]] }
+        });
+        return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" }});
+    }
+
+    // 4. EDIT TASK NAME
+    if (url.searchParams.get("action") === "editTask" && req.method === "POST") {
+        const body = await req.json();
+        await sheets.spreadsheets.values.update({
+            spreadsheetId: spreadsheetId,
+            range: `Sheet1!A${body.rowNumber}`, // Update Column A
+            valueInputOption: 'USER_ENTERED',
+            requestBody: { values: [[body.newName]] }
+        });
+        return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" }});
+    }
+
+    // 5. DELETE TASK
+    if (url.searchParams.get("action") === "deleteTask" && req.method === "POST") {
+        const body = await req.json();
+        // We use "clear" to empty the row so we don't mess up the sheet structure
+        await sheets.spreadsheets.values.clear({
+            spreadsheetId: spreadsheetId,
+            range: `Sheet1!A${body.rowNumber}:D${body.rowNumber}` 
+        });
+        return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" }});
+    }
+
+    // 6. ASK AI
     if (url.searchParams.get("action") === "askAI" && req.method === "POST") {
         const body = await req.json();
-        
-        // Fetch context for the AI
-        const sheetData = await sheets.spreadsheets.values.get({
-            spreadsheetId: spreadsheetId,
-            range: 'Sheet1!A:B',
-        });
+        const sheetData = await sheets.spreadsheets.values.get({ spreadsheetId: spreadsheetId, range: 'Sheet1!A:D' });
         const myData = JSON.stringify(sheetData.data.values || "No data");
 
         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });

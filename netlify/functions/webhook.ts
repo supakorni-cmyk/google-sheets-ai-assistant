@@ -65,27 +65,48 @@ export default async (req: Request, context: Context) => {
                 }
                 
                 // COMMAND: LOG EXPENSE (FINANCES)
+                // COMMAND: LOG EXPENSE (FINANCES)
                 else if (userMessage.toLowerCase().startsWith('spent:')) {
                     let rawText = userMessage.substring(6).trim(); // e.g. "150 on coffee"
                     let amount = 0;
                     let item = rawText;
                     
-                    // Simple logic to pull the number and the item
+                    // Pull the number and the item
                     const parts = rawText.split(' ');
                     if (!isNaN(parseFloat(parts[0]))) {
                         amount = parseFloat(parts[0]);
                         item = parts.slice(1).join(' ').replace(/^on /i, '').trim();
                     }
 
+                    // --- NEW: AUTO-CATEGORIZER ---
+                    let category = 'Misc';
+                    const lowerItem = item.toLowerCase();
+                    
+                    if (/(coffee|food|lunch|dinner|breakfast|snack|pad thai|restaurant|groceries|water)/i.test(lowerItem)) {
+                        category = 'Food';
+                    } else if (/(gas|petrol|taxi|grab|bts|mrt|train|bus|transport|toll)/i.test(lowerItem)) {
+                        category = 'Transport';
+                    } else if (/(bill|electric|rent|internet|phone|netflix|spotify|subscription)/i.test(lowerItem)) {
+                        category = 'Bills';
+                    } else if (/(shirt|shoes|clothes|mall|amazon|shopee|lazada)/i.test(lowerItem)) {
+                        category = 'Shopping';
+                    } else if (/(movie|cinema|game|concert|party)/i.test(lowerItem)) {
+                        category = 'Entertainment';
+                    }
+                    // -----------------------------
+
                     await sheets.spreadsheets.values.append({
                         spreadsheetId: spreadsheetId, range: 'Finances!A:D', valueInputOption: 'USER_ENTERED',
-                        requestBody: { values: [[now, item, amount, 'Misc']] }
+                        requestBody: { values: [[now, item, amount, category]] }
                     });
 
-                    let replyText = `💸 Logged: ฿${amount} for "${item}"`;
+                    let replyText = `💸 Logged: ฿${amount} for "${item}"\n📂 Category: ${category}`;
                     if (isVoice) replyText = `🎙️ Heard: "${userMessage}"\n` + replyText;
 
-                    await lineClient.replyMessage({ replyToken: messageEvent.replyToken || '', messages: [{ type: 'text', text: replyText }] });
+                    await lineClient.replyMessage({ 
+                        replyToken: messageEvent.replyToken || '', 
+                        messages: [{ type: 'text', text: replyText }] 
+                    });
                 }
 
                 // COMMAND: ADD TASK

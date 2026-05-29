@@ -28,21 +28,40 @@ export default async (req: Request, context: Context) => {
                 const userMessage = event.message.text;
 
                 // 1. ADD TASK LOGIC
+                // 1. ADD TASK LOGIC
                 if (userMessage.toLowerCase().startsWith('add task:')) {
-                    const newTask = userMessage.substring(9).trim();
+                    let rawTask = userMessage.substring(9).trim();
+                    let taskName = rawTask;
+                    let deadline = "-";
+                    
+                    // Check if the user included a deadline using the word "by"
+                    if (rawTask.toLowerCase().includes(' by ')) {
+                        // Split the string at " by " (case-insensitive)
+                        const parts = rawTask.split(/ by /i);
+                        taskName = parts[0].trim();
+                        deadline = parts[1].trim();
+                    }
+
+                    // Get current time in Thailand
+                    const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
                     
                     await sheets.spreadsheets.values.append({
                         spreadsheetId: spreadsheetId,
-                        range: 'Sheet1!A:B',
+                        range: 'Sheet1!A:D', // Expanded range to A:D
                         valueInputOption: 'USER_ENTERED',
-                        requestBody: { values: [[newTask, 'Pending']] }
+                        requestBody: { values: [[taskName, 'Pending', now, deadline]] }
                     });
+
+                    // Format a nice reply
+                    const replyText = deadline === "-" 
+                        ? `✅ Added: "${taskName}"` 
+                        : `✅ Added: "${taskName}"\n⏳ Deadline: ${deadline}`;
 
                     await lineClient.replyMessage({
                         replyToken: event.replyToken || '',
-                        messages: [{ type: 'text', text: `✅ Added: "${newTask}"` }]
+                        messages: [{ type: 'text', text: replyText }]
                     });
-                } 
+                }
                 // 2. AI CHAT LOGIC
                 else {
                     const sheetData = await sheets.spreadsheets.values.get({

@@ -21,7 +21,10 @@
 
     <div class="card">
         <h2>➕ Add New Task</h2>
-        <input type="text" id="newTaskInput" placeholder="Pay the electric bill...">
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <input type="text" id="newTaskInput" placeholder="Pay the electric bill..." style="flex: 2;">
+            <input type="datetime-local" id="deadlineInput" style="flex: 1; padding: 0.75rem; border: 1px solid #ccc; border-radius: 6px;">
+        </div>
         <button onclick="createTask()">Save Task</button>
     </div>
 
@@ -59,9 +62,14 @@
             document.getElementById('sheetContent').innerHTML = html;
         }
 
-        async function createTask() {
+       async function createTask() {
             const taskInput = document.getElementById('newTaskInput');
+            const deadlineInput = document.getElementById('deadlineInput');
+            
             const taskText = taskInput.value;
+            // Format the deadline nicely if the user selected one
+            const deadlineDate = deadlineInput.value ? new Date(deadlineInput.value).toLocaleString() : "-";
+            
             if (!taskText) return;
 
             taskInput.value = 'Saving...';
@@ -70,10 +78,11 @@
             await fetch('/api?action=createTask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ task: taskText })
+                body: JSON.stringify({ task: taskText, deadline: deadlineDate })
             });
 
             taskInput.value = '';
+            deadlineInput.value = '';
             taskInput.disabled = false;
             fetchSheetData(); // Refresh table
         }

@@ -1,19 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>AI Command Center</title>
-    
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#f3f4f6">
+    <meta name="theme-color" content="#10a37f">
     <link rel="apple-touch-icon" href="/icon-192.png">
-
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Command Center</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mobile-drag-drop@3.0.0-rc.0/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mobile-drag-drop@3.0.0-rc.0/scroll-behaviour.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mobile-drag-drop@3.0.0-rc.0/default.css">
-
     <style>
         :root {
             --bg: #f3f4f6; --card-bg: #ffffff; --text: #1f2937;
@@ -21,121 +15,83 @@
             --border: #e5e7eb;
         }
 
-        /* 2. Safe Area Insets for iPhone Notch and Home Bar */
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
-            background: var(--bg); 
-            color: var(--text); 
-            margin: 0; 
-            padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        .container { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
-        
-        h1 { text-align: center; margin-bottom: 2rem; color: #111827; font-size: 1.5rem; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 2rem; color: #111827; }
         h2 { font-size: 1.25rem; margin-top: 0; margin-bottom: 1rem; }
 
         .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; align-items: start; }
-        .card { background: var(--card-bg); padding: 1.5rem; border-radius: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid var(--border); margin-bottom: 1.5rem; }
+        @media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr; } }
 
-        /* Mobile Adjustments for Dashboard */
-        @media (max-width: 800px) { 
-            .dashboard-grid { grid-template-columns: 1fr; } 
-            .container { padding: 1rem; }
-        }
+        .card { background: var(--card-bg); padding: 1.5rem; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid var(--border); margin-bottom: 1.5rem; }
 
-        /* 3. iPhone Optimized Kanban Board (Carousel Swipe) */
+        /* Kanban Board Styles */
         .kanban-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-        .kanban-col { background: #f9fafb; border-radius: 16px; padding: 1rem; border: 1px solid var(--border); display: flex; flex-direction: column; }
-        .kanban-header { font-weight: 700; margin-bottom: 1rem; text-align: center; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em; color: #4b5563; }
+        .kanban-col { background: #f9fafb; border-radius: 12px; padding: 1rem; border: 1px solid var(--border); display: flex; flex-direction: column; }
+        .kanban-header { font-weight: bold; margin-bottom: 1rem; text-align: center; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em; color: #4b5563; }
         .kanban-cards { flex-grow: 1; min-height: 200px; }
         
-        @media (max-width: 800px) {
-            .kanban-board {
-                display: flex;
-                overflow-x: auto;
-                scroll-snap-type: x mandatory;
-                padding-bottom: 10px;
-                -webkit-overflow-scrolling: touch;
-            }
-            .kanban-col {
-                min-width: 85vw; /* Leaves 15% to peek at the next column */
-                scroll-snap-align: center;
-                flex-shrink: 0;
-            }
-            /* Hide scrollbar for cleaner look on iOS */
-            .kanban-board::-webkit-scrollbar { display: none; }
-        }
-
         /* Task Cards */
-        .task-card { background: white; padding: 1.25rem 1rem; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 0.75rem; cursor: grab; box-shadow: 0 2px 4px rgba(0,0,0,0.04); position: relative; touch-action: none; }
-        .task-card:active { cursor: grabbing; box-shadow: 0 8px 16px rgba(0,0,0,0.1); transform: scale(1.02); }
-        .task-title { font-weight: 600; margin-bottom: 0.5rem; font-size: 1rem; padding-right: 20px; }
-        .task-meta { display: flex; gap: 0.5rem; font-size: 0.8rem; color: #6b7280; }
-        .badge { background: #e5e7eb; padding: 4px 8px; border-radius: 6px; font-weight: 500; }
-        
-        /* Delete button made slightly larger for touch */
-        .delete-btn { position: absolute; top: 12px; right: 12px; background: #fee2e2; border: none; color: #ef4444; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 1.2rem; }
+        .task-card { background: white; padding: 1rem; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 0.75rem; cursor: grab; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: relative; }
+        .task-card:active { cursor: grabbing; }
+        .task-title { font-weight: 600; margin-bottom: 0.5rem; font-size: 0.95rem; }
+        .task-meta { display: flex; gap: 0.5rem; font-size: 0.75rem; color: #6b7280; }
+        .badge { background: #e5e7eb; padding: 2px 6px; border-radius: 4px; }
+        .delete-btn { position: absolute; top: 8px; right: 8px; background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1rem; opacity: 0; transition: opacity 0.2s; }
+        .task-card:hover .delete-btn { opacity: 1; }
 
         /* Finances Styles */
-        .finance-total { font-size: 2.5rem; font-weight: 800; text-align: center; color: var(--text); margin-bottom: 1rem; letter-spacing: -1px; }
-        .expense-list { margin-top: 1.5rem; font-size: 0.95rem; max-height: 250px; overflow-y: auto; }
-        .expense-item { display: flex; justify-content: space-between; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+        .finance-total { font-size: 2.5rem; font-weight: bold; text-align: center; color: var(--text); margin-bottom: 1rem; }
+        .expense-list { margin-top: 1.5rem; font-size: 0.9rem; max-height: 200px; overflow-y: auto; }
+        .expense-item { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>🚀 AI Command Center</h1>
+    <h1>🚀 My AI Command Center</h1>
 
-        <div class="dashboard-grid">
-            
-            <div>
-                <div class="card">
-                    <h2>📋 Kanban Board</h2>
-                    <div class="kanban-board">
-                        <div class="kanban-col" ondrop="drop(event, 'Pending')" ondragover="allowDrop(event)">
-                            <div class="kanban-header" style="color: var(--pending)">⏳ To Do</div>
-                            <div class="kanban-cards" id="col-Pending"></div>
-                        </div>
-                        <div class="kanban-col" ondrop="drop(event, 'In Progress')" ondragover="allowDrop(event)">
-                            <div class="kanban-header" style="color: var(--progress)">🚀 In Progress</div>
-                            <div class="kanban-cards" id="col-In Progress"></div>
-                        </div>
-                        <div class="kanban-col" ondrop="drop(event, 'Done')" ondragover="allowDrop(event)">
-                            <div class="kanban-header" style="color: var(--primary)">✅ Done</div>
-                            <div class="kanban-cards" id="col-Done"></div>
-                        </div>
+    <div class="dashboard-grid">
+        
+        <div>
+            <div class="card">
+                <h2>📋 Task Kanban Board</h2>
+                <div class="kanban-board">
+                    <div class="kanban-col" ondrop="drop(event, 'Pending')" ondragover="allowDrop(event)">
+                        <div class="kanban-header" style="color: var(--pending)">⏳ To Do</div>
+                        <div class="kanban-cards" id="col-Pending"></div>
+                    </div>
+                    <div class="kanban-col" ondrop="drop(event, 'In Progress')" ondragover="allowDrop(event)">
+                        <div class="kanban-header" style="color: var(--progress)">🚀 In Progress</div>
+                        <div class="kanban-cards" id="col-In Progress"></div>
+                    </div>
+                    <div class="kanban-col" ondrop="drop(event, 'Done')" ondragover="allowDrop(event)">
+                        <div class="kanban-header" style="color: var(--primary)">✅ Done</div>
+                        <div class="kanban-cards" id="col-Done"></div>
                     </div>
                 </div>
             </div>
-
-            <div>
-                <div class="card">
-                    <h2>💸 Monthly Finances</h2>
-                    <div class="finance-total" id="financeTotal">฿0</div>
-                    <canvas id="expenseChart" style="max-height: 250px;"></canvas>
-                    <div class="expense-list" id="expenseList"></div>
-                </div>
-            </div>
-
         </div>
+
+        <div>
+            <div class="card">
+                <h2>💸 Monthly Finances</h2>
+                <div class="finance-total" id="financeTotal">฿0</div>
+                <canvas id="expenseChart"></canvas>
+                <div class="expense-list" id="expenseList"></div>
+            </div>
+        </div>
+
     </div>
 
     <script>
-        // --- IOS DRAG AND DROP POLYFILL INIT ---
-        MobileDragDrop.polyfill({
-            dragImageTranslateOverride: mobileDragDrop.scrollBehaviourDragImageTranslateOverride
-        });
-
         let expenseChartInstance = null;
 
         async function fetchData() {
+            // 1. Fetch Tasks
             const tasksRes = await fetch('/api?action=getTasks');
             const tasks = await tasksRes.json();
             renderKanban(tasks);
 
+            // 2. Fetch Finances
             const financesRes = await fetch('/api?action=getFinances');
             const finances = await financesRes.json();
             renderFinances(finances);
@@ -148,20 +104,20 @@
             document.getElementById('col-Done').innerHTML = '';
 
             tasks.forEach((item, index) => {
-                if (index === 0 || !item.data || item.data.length === 0 || !item.data[0]) return; 
+                if (index === 0 || !item.data || item.data.length === 0 || !item.data[0]) return; // Skip headers & empty
 
                 const [name, status, category, time, added, deadline] = item.data;
                 const safeStatus = status === 'Done' ? 'Done' : (status === 'In Progress' ? 'In Progress' : 'Pending');
 
                 const cardHTML = `
                     <div class="task-card" draggable="true" ondragstart="drag(event)" id="task-${item.rowNumber}">
-                        <button class="delete-btn" onclick="deleteTask(${item.rowNumber})">×</button>
+                        <button class="delete-btn" onclick="deleteTask(${item.rowNumber})" title="Delete">×</button>
                         <div class="task-title">${name}</div>
                         <div class="task-meta">
                             ${category ? `<span class="badge">${category}</span>` : ''}
                             ${time ? `<span>⏱️ ${time}</span>` : ''}
                         </div>
-                        ${deadline && deadline !== '-' ? `<div style="font-size:0.8rem; color:#ef4444; margin-top:8px; font-weight:500;">📅 Due: ${new Date(deadline).toLocaleDateString()}</div>` : ''}
+                        ${deadline && deadline !== '-' ? `<div style="font-size:0.75rem; color:#ef4444; margin-top:6px;">📅 Due: ${new Date(deadline).toLocaleDateString()}</div>` : ''}
                     </div>
                 `;
                 document.getElementById(`col-${safeStatus}`).insertAdjacentHTML('beforeend', cardHTML);
@@ -175,9 +131,11 @@
             const rowId = ev.dataTransfer.getData("rowId");
             const rowNumber = rowId.split('-')[1];
             
+            // Instantly move the UI for snappy feel
             const dropTarget = ev.target.closest('.kanban-col').querySelector('.kanban-cards');
             dropTarget.appendChild(document.getElementById(rowId));
 
+            // Tell the backend to update Google Sheets
             await fetch('/api?action=updateTaskStatus', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -187,7 +145,7 @@
 
         async function deleteTask(rowNumber) {
             if(!confirm("Delete this task?")) return;
-            document.getElementById(`task-${rowNumber}`).remove(); 
+            document.getElementById(`task-${rowNumber}`).remove(); // UI remove immediately
             await fetch('/api?action=deleteTask', { method: 'POST', body: JSON.stringify({ rowNumber }) });
         }
 
@@ -199,6 +157,7 @@
             const categories = {};
             let listHTML = '';
 
+            // Skip header row (index 0)
             for(let i = finances.length - 1; i > 0; i--) {
                 const [date, item, amountStr, cat] = finances[i];
                 if (!item) continue;
@@ -209,14 +168,16 @@
                 const category = cat || 'Misc';
                 categories[category] = (categories[category] || 0) + amount;
 
+                // Add to recent list (limit to 5)
                 if (finances.length - i <= 5) {
-                    listHTML += `<div class="expense-item"><span>${item} <small style="color:#6b7280">(${category})</small></span> <strong>฿${amount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></div>`;
+                    listHTML += `<div class="expense-item"><span>${item} <small style="color:#6b7280">(${category})</small></span> <strong>฿${amount.toFixed(2)}</strong></div>`;
                 }
             }
 
             document.getElementById('financeTotal').innerText = `฿${totalSpent.toLocaleString()}`;
             document.getElementById('expenseList').innerHTML = listHTML;
 
+            // Render Chart.js
             const ctx = document.getElementById('expenseChart').getContext('2d');
             if(expenseChartInstance) expenseChartInstance.destroy();
             
@@ -230,18 +191,22 @@
                         borderWidth: 0
                     }]
                 },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
+                options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
             });
         }
 
-        // Register Service Worker for PWA
+        // Load dashboard
+        fetchData();
+    </script>
+    <script>
+        // Register the Service Worker for PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch(err => console.error('SW Error', err));
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker Registered!'))
+                    .catch(err => console.error('Service Worker Error', err));
             });
         }
-
-        fetchData();
     </script>
 </body>
 </html>

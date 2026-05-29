@@ -3,8 +3,10 @@ import { messagingApi, webhook } from '@line/bot-sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { google } from 'googleapis';
 
+// 1. Initialize BOTH LINE Clients (Text Client and Blob Client)
 const lineClient = new messagingApi.MessagingApiClient({ channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '' });
-// IMPORTANT: Use gemini-1.5-flash as it has native audio stream support in the API
+const blobClient = new messagingApi.MessagingApiBlobClient({ channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '' });
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 const sheetsAuth = new google.auth.JWT({
@@ -33,13 +35,14 @@ export default async (req: Request, context: Context) => {
                 } 
                 else if (event.message.type === 'audio') {
                     isVoice = true;
-                    // Fetch the audio stream from LINE
-                    const stream = await lineClient.getMessageContent(event.message.id);
+                    
+                    // Fetch the audio stream using the BLOB client
+                    const stream = await blobClient.getMessageContent(event.message.id);
                     
                     // Convert stream to Base64
                     const buffer = await new Promise<Buffer>((resolve, reject) => {
                         const chunks: any[] = [];
-                        stream.on('data', (chunk) => chunks.push(chunk));
+                        stream.on('data', (chunk: any) => chunks.push(chunk));
                         stream.on('end', () => resolve(Buffer.concat(chunks)));
                         stream.on('error', reject);
                     });
@@ -60,11 +63,14 @@ export default async (req: Request, context: Context) => {
 
             // --- 2. PROCESS THE MESSAGE (Text or Transcribed Audio) ---
             if (userMessage) {
+                // Cast the event to a MessageEvent so TypeScript knows replyToken exists
+                const messageEvent = event as webhook.MessageEvent;
+
                 // If it's a LIFF trigger
                 if (userMessage.toLowerCase().trim() === 'add task') {
                     await lineClient.replyMessage({
-                        replyToken: event.replyToken || '',
-                        messages: [{ type: 'text', text: '📝 Click here to open the Task Form:\nhttps://liff.line.me/YOUR_LIFF_ID_HERE' }]
+                        replyToken: messageEvent.replyToken || '',
+                        messages: [{ type: 'text', text: '📝 Click here to open the Task Form:\nhttps://liff.line.me/2010230678-8eqN4V5B' }]
                     });
                     continue;
                 }
@@ -92,7 +98,10 @@ export default async (req: Request, context: Context) => {
                     let replyText = deadline === "-" ? `✅ Added: "${taskName}"` : `✅ Added: "${taskName}"\n⏳ Due: ${deadline}`;
                     if (isVoice) replyText = `🎙️ Heard: "${taskName}"\n` + replyText;
 
-                    await lineClient.replyMessage({ replyToken: event.replyToken || '', messages: [{ type: 'text', text: replyText }] });
+                    await lineClient.replyMessage({ 
+                        replyToken: messageEvent.replyToken || '', 
+                        messages: [{ type: 'text', text: replyText }] 
+                    });
                 } 
                 
                 // General AI Chat
@@ -104,7 +113,10 @@ export default async (req: Request, context: Context) => {
                     let replyPrefix = isVoice ? `🎙️ Heard: "${userMessage}"\n\n` : "";
                     const result = await model.generateContent(`You are my personal assistant. User asked: "${userMessage}". Latest data from Google Sheet: ${myData}. Respond conversationally and concisely.`);
                     
-                    await lineClient.replyMessage({ replyToken: event.replyToken || '', messages: [{ type: 'text', text: replyPrefix + result.response.text() }] });
+                    await lineClient.replyMessage({ 
+                        replyToken: messageEvent.replyToken || '', 
+                        messages: [{ type: 'text', text: replyPrefix + result.response.text() }] 
+                    });
                 }
             }
         }

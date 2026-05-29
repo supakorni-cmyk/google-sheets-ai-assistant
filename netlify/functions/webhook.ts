@@ -3,18 +3,16 @@ import { messagingApi, webhook } from '@line/bot-sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { google } from 'googleapis';
 
-const lineClient = new messagingApi.MessagingApiClient({ 
-    channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '' 
-});
+const lineClient = new messagingApi.MessagingApiClient({ channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '' });
+// IMPORTANT: Use gemini-1.5-flash as it has native audio stream support in the API
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
-const auth = new google.auth.JWT({
+const sheetsAuth = new google.auth.JWT({
     email: process.env.GOOGLE_CLIENT_EMAIL || '',
     key: (process.env.GOOGLE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-    scopes: ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/calendar']
+    scopes: ['https://www.googleapis.com/auth/spreadsheets']
 });
-const sheets = google.sheets({ version: 'v4', auth });
-const calendar = google.calendar({ version: 'v3', auth });
+const sheets = google.sheets({ version: 'v4', auth: sheetsAuth });
 
 export default async (req: Request, context: Context) => {
     if (req.method !== "POST") return new Response("Method Not Allowed", { status: 405 });
@@ -23,88 +21,91 @@ export default async (req: Request, context: Context) => {
         const body = await req.json();
         const events: webhook.Event[] = body.events;
         const spreadsheetId = process.env.GOOGLE_SHEET_ID || '';
-        const calendarId = process.env.GOOGLE_CALENDAR_ID || 'primary';
 
         for (const event of events) {
-            // 1. HANDLE AUDIO MESSAGES
-            if (event.type === 'message' && event.message.type === 'audio') {
-                await lineClient.replyMessage({
-                    replyToken: event.replyToken || '',
-                    messages: [{ type: 'text', text: "🎙️ I received your audio! (Voice processing logic will be activated soon)." }]
-                });
-                continue;
+            let userMessage = "";
+            let isVoice = false;
+
+            // --- 1. CAPTURE TEXT OR VOICE ---
+            if (event.type === 'message') {
+                if (event.message.type === 'text') {
+                    userMessage = event.message.text;
+                } 
+                else if (event.message.type === 'audio') {
+                    isVoice = true;
+                    // Fetch the audio stream from LINE
+                    const stream = await lineClient.getMessageContent(event.message.id);
+                    
+                    // Convert stream to Base64
+                    const buffer = await new Promise<Buffer>((resolve, reject) => {
+                        const chunks: any[] = [];
+                        stream.on('data', (chunk) => chunks.push(chunk));
+                        stream.on('end', () => resolve(Buffer.concat(chunks)));
+                        stream.on('error', reject);
+                    });
+                    const base64Audio = buffer.toString('base64');
+
+                    // Send to Gemini to transcribe
+                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                    const prompt = "Transcribe this audio. If the user is giving a task, return EXACTLY the phrase 'add task: ' followed by the task and deadline (e.g., 'add task: buy groceries by tomorrow'). Otherwise, just return the transcription.";
+                    
+                    const result = await model.generateContent([
+                        prompt,
+                        { inlineData: { data: base64Audio, mimeType: "audio/mp4" } }
+                    ]);
+                    
+                    userMessage = result.response.text().trim();
+                }
             }
 
-            // 2. HANDLE TEXT MESSAGES (THE MASTER ROUTER)
-            if (event.type === 'message' && event.message.type === 'text') {
-                const userMessage = event.message.text;
-
-                // Tell Gemini to strictly return a JSON structure determining the user's intent
-                const systemPrompt = `You are an elite personal assistant. Analyze the user's message.
-                Decide if the user is logging an EXPENSE, adding a TASK, or having a general CHAT.
-                Return ONLY a valid JSON object matching this structure:
-                {
-                    "intent": "TASK" | "EXPENSE" | "CHAT",
-                    "taskData": {"name": "", "deadline_iso": "", "category": "Work|Personal|Errand", "estMinutes": 30},
-                    "expenseData": {"item": "", "amount": 0, "category": "Food|Transport|Bills|Misc"},
-                    "reply": "Your friendly conversational reply to the user"
+            // --- 2. PROCESS THE MESSAGE (Text or Transcribed Audio) ---
+            if (userMessage) {
+                // If it's a LIFF trigger
+                if (userMessage.toLowerCase().trim() === 'add task') {
+                    await lineClient.replyMessage({
+                        replyToken: event.replyToken || '',
+                        messages: [{ type: 'text', text: '📝 Click here to open the Task Form:\nhttps://liff.line.me/YOUR_LIFF_ID_HERE' }]
+                    });
+                    continue;
                 }
-                If it's a task with a timeframe, estimate the ISO 8601 deadline. Today is ${new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" })}`;
-
-                const model = genAI.getGenerativeModel({ 
-                    model: "gemini-2.5-flash",
-                    generationConfig: { responseMimeType: "application/json" } 
-                });
                 
-                const result = await model.generateContent(`${systemPrompt}\n\nUser Message: "${userMessage}"`);
-                const aiDecision = JSON.parse(result.response.text());
-
-                const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
-
-                // -- ROUTE A: EXPENSE LOGGING --
-                if (aiDecision.intent === 'EXPENSE') {
-                    const ex = aiDecision.expenseData;
-                    await sheets.spreadsheets.values.append({
-                        spreadsheetId: spreadsheetId,
-                        range: 'Finances!A:D',
-                        valueInputOption: 'USER_ENTERED',
-                        requestBody: { values: [[now, ex.item, ex.amount, ex.category]] }
-                    });
-                }
-
-                // -- ROUTE B: TASK CREATION & CALENDAR SYNC --
-                else if (aiDecision.intent === 'TASK') {
-                    const tk = aiDecision.taskData;
+                // If it's a task creation command
+                else if (userMessage.toLowerCase().startsWith('add task:')) {
+                    let rawTask = userMessage.substring(9).trim();
+                    let taskName = rawTask;
+                    let deadline = "-";
                     
-                    // 1. Save to Sheet (Columns: Task, Status, Category, Time, Date Added, Deadline)
+                    if (rawTask.toLowerCase().includes(' by ')) {
+                        const parts = rawTask.split(/ by /i);
+                        taskName = parts[0].trim();
+                        deadline = parts[1].trim();
+                    }
+
+                    const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
+                    
                     await sheets.spreadsheets.values.append({
-                        spreadsheetId: spreadsheetId,
-                        range: 'Tasks!A:F',
-                        valueInputOption: 'USER_ENTERED',
-                        requestBody: { values: [[tk.name, 'Pending', tk.category, `${tk.estMinutes} mins`, now, tk.deadline_iso || "-"]] }
+                        spreadsheetId: spreadsheetId, range: 'Sheet1!A:D', valueInputOption: 'USER_ENTERED',
+                        requestBody: { values: [[taskName, 'Pending', now, deadline]] }
                     });
 
-                    // 2. Add to Google Calendar (If a deadline/time was parsed)
-                    if (tk.deadline_iso) {
-                        const endTime = new Date(tk.deadline_iso);
-                        const startTime = new Date(endTime.getTime() - (tk.estMinutes * 60000)); // Subtract estimated minutes
-                        
-                        await calendar.events.insert({
-                            calendarId: calendarId,
-                            requestBody: {
-                                summary: `[AI] ${tk.name}`,
-                                start: { dateTime: startTime.toISOString() },
-                                end: { dateTime: endTime.toISOString() },
-                            }
-                        });
-                    }
-                }
+                    // If it was voice, let them know what the bot heard
+                    let replyText = deadline === "-" ? `✅ Added: "${taskName}"` : `✅ Added: "${taskName}"\n⏳ Due: ${deadline}`;
+                    if (isVoice) replyText = `🎙️ Heard: "${taskName}"\n` + replyText;
 
-                // Send the conversational reply Gemini generated back to the user
-                await lineClient.replyMessage({
-                    replyToken: event.replyToken || '',
-                    messages: [{ type: 'text', text: aiDecision.reply }]
-                });
+                    await lineClient.replyMessage({ replyToken: event.replyToken || '', messages: [{ type: 'text', text: replyText }] });
+                } 
+                
+                // General AI Chat
+                else {
+                    const sheetData = await sheets.spreadsheets.values.get({ spreadsheetId: spreadsheetId, range: 'Sheet1!A:D' });
+                    const myData = JSON.stringify(sheetData.data.values || "No data");
+                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+                    
+                    let replyPrefix = isVoice ? `🎙️ Heard: "${userMessage}"\n\n` : "";
+                    const result = await model.generateContent(`You are my personal assistant. User asked: "${userMessage}". Latest data from Google Sheet: ${myData}. Respond conversationally and concisely.`);
+                    
+                    await lineClient.replyMessage({ replyToken: event.replyToken || '', messages: [{ type: 'text', text: replyPrefix + result.response.text() }] });
+                }
             }
         }
         return new Response("OK", { status: 200 });

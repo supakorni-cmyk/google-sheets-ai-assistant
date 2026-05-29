@@ -15,27 +15,44 @@
             --border: #e5e7eb;
         }
 
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
-        h1 { text-align: center; margin-bottom: 2rem; color: #111827; }
-        h2 { font-size: 1.25rem; margin-top: 0; margin-bottom: 1rem; }
+        /* --- DARK MODE VARIABLES --- */
+        body.dark-mode {
+            --bg: #111827; --card-bg: #1f2937;
+            --text: #f9fafb; --border: #374151;
+        }
+        body.dark-mode .kanban-col { background: #111827; }
+        body.dark-mode .task-card { background: #374151; border-color: #4b5563; }
+        body.dark-mode .kanban-header { color: #d1d5db; }
+        body.dark-mode .badge { background: #4b5563; color: #f9fafb; }
+
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 1200px; margin: 0 auto; transition: background 0.3s, color 0.3s; }
+        
+        .header-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+        h1 { margin: 0; color: var(--text); text-align: center; flex-grow: 1;}
+        h2 { font-size: 1.25rem; margin: 0; }
+
+        .theme-toggle { background: var(--card-bg); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 8px; cursor: pointer; font-size: 1.2rem; transition: background 0.3s; }
 
         .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; align-items: start; }
         @media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr; } }
 
-        .card { background: var(--card-bg); padding: 1.5rem; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid var(--border); margin-bottom: 1.5rem; }
+        .card { background: var(--card-bg); padding: 1.5rem; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid var(--border); margin-bottom: 1.5rem; transition: background 0.3s; }
 
         /* Kanban Board Styles */
+        .kanban-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .kanban-sort { padding: 0.5rem; border-radius: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--border); outline: none; cursor: pointer; }
+
         .kanban-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
-        .kanban-col { background: #f9fafb; border-radius: 12px; padding: 1rem; border: 1px solid var(--border); display: flex; flex-direction: column; }
-        .kanban-header { font-weight: bold; margin-bottom: 1rem; text-align: center; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em; color: #4b5563; }
+        .kanban-col { background: #f9fafb; border-radius: 12px; padding: 1rem; border: 1px solid var(--border); display: flex; flex-direction: column; transition: background 0.3s; }
+        .kanban-header { font-weight: bold; margin-bottom: 1rem; text-align: center; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em; color: #4b5563; transition: color 0.3s; }
         .kanban-cards { flex-grow: 1; min-height: 200px; }
         
         /* Task Cards */
-        .task-card { background: white; padding: 1rem; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 0.75rem; cursor: grab; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: relative; }
+        .task-card { background: white; padding: 1rem; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 0.75rem; cursor: grab; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: relative; transition: background 0.3s; }
         .task-card:active { cursor: grabbing; }
         .task-title { font-weight: 600; margin-bottom: 0.5rem; font-size: 0.95rem; }
         .task-meta { display: flex; gap: 0.5rem; font-size: 0.75rem; color: #6b7280; }
-        .badge { background: #e5e7eb; padding: 2px 6px; border-radius: 4px; }
+        .badge { background: #e5e7eb; padding: 2px 6px; border-radius: 4px; transition: background 0.3s; }
         .delete-btn { position: absolute; top: 8px; right: 8px; background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1rem; opacity: 0; transition: opacity 0.2s; }
         .task-card:hover .delete-btn { opacity: 1; }
 
@@ -47,13 +64,24 @@
 </head>
 <body>
 
-    <h1>🚀 My AI Command Center</h1>
+    <div class="header-container">
+        <div style="width: 44px;"></div> 
+        <h1>🚀 My AI Command Center</h1>
+        <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Toggle Dark Mode">🌙</button>
+    </div>
 
     <div class="dashboard-grid">
         
         <div>
             <div class="card">
-                <h2>📋 Task Kanban Board</h2>
+                <div class="kanban-header-row">
+                    <h2>📋 Task Kanban Board</h2>
+                    <select class="kanban-sort" id="sortSelect" onchange="sortKanban()">
+                        <option value="default">Sort: Default (Added)</option>
+                        <option value="name">Sort: Alphabetical</option>
+                        <option value="deadline">Sort: By Deadline</option>
+                    </select>
+                </div>
                 <div class="kanban-board">
                     <div class="kanban-col" ondrop="drop(event, 'Pending')" ondragover="allowDrop(event)">
                         <div class="kanban-header" style="color: var(--pending)">⏳ To Do</div>
@@ -83,18 +111,52 @@
     </div>
 
     <script>
+        // --- DARK MODE LOGIC ---
+        function toggleTheme() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            document.getElementById('themeBtn').innerText = isDark ? '☀️' : '🌙';
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            
+            // Re-render chart to update colors if needed
+            if(expenseChartInstance) expenseChartInstance.update();
+        }
+        if (localStorage.getItem('theme') === 'dark') { toggleTheme(); }
+
         let expenseChartInstance = null;
+        let globalTasks = []; // Store tasks globally for sorting
 
         async function fetchData() {
             // 1. Fetch Tasks
             const tasksRes = await fetch('/api?action=getTasks');
-            const tasks = await tasksRes.json();
-            renderKanban(tasks);
+            globalTasks = await tasksRes.json();
+            renderKanban(globalTasks);
 
             // 2. Fetch Finances
             const financesRes = await fetch('/api?action=getFinances');
             const finances = await financesRes.json();
             renderFinances(finances);
+        }
+
+        // --- SORTING LOGIC ---
+        function sortKanban() {
+            const sortType = document.getElementById('sortSelect').value;
+            let sortedTasks = [...globalTasks]; // Clone array to sort safely
+            
+            if (sortType === 'name') {
+                sortedTasks.sort((a, b) => {
+                    if (!a.data || !b.data || a.data.length === 0 || b.data.length === 0) return 0;
+                    return (a.data[0] || '').localeCompare(b.data[0] || '');
+                });
+            } else if (sortType === 'deadline') {
+                sortedTasks.sort((a, b) => {
+                    if (!a.data || !b.data || a.data.length === 0 || b.data.length === 0) return 0;
+                    const d1 = a.data[5] && a.data[5] !== '-' ? new Date(a.data[5]).getTime() : Infinity;
+                    const d2 = b.data[5] && b.data[5] !== '-' ? new Date(b.data[5]).getTime() : Infinity;
+                    return d1 - d2;
+                });
+            }
+            renderKanban(sortedTasks);
         }
 
         // --- KANBAN LOGIC ---
@@ -141,12 +203,18 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ rowNumber: rowNumber, status: newStatus })
             });
+            
+            // Update global data so sorting still works after drag
+            const taskIndex = globalTasks.findIndex(t => t.rowNumber == rowNumber);
+            if(taskIndex > -1) globalTasks[taskIndex].data[1] = newStatus;
         }
 
         async function deleteTask(rowNumber) {
             if(!confirm("Delete this task?")) return;
             document.getElementById(`task-${rowNumber}`).remove(); // UI remove immediately
             await fetch('/api?action=deleteTask', { method: 'POST', body: JSON.stringify({ rowNumber }) });
+            
+            globalTasks = globalTasks.filter(t => t.rowNumber != rowNumber);
         }
 
         // --- FINANCE LOGIC ---
@@ -170,7 +238,7 @@
 
                 // Add to recent list (limit to 5)
                 if (finances.length - i <= 5) {
-                    listHTML += `<div class="expense-item"><span>${item} <small style="color:#6b7280">(${category})</small></span> <strong>฿${amount.toFixed(2)}</strong></div>`;
+                    listHTML += `<div class="expense-item"><span>${item} <small style="color:var(--text-light)">(${category})</small></span> <strong>฿${amount.toFixed(2)}</strong></div>`;
                 }
             }
 
@@ -191,7 +259,7 @@
                         borderWidth: 0
                     }]
                 },
-                options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: document.body.classList.contains('dark-mode') ? '#f9fafb' : '#1f2937' } } } }
             });
         }
 
@@ -203,7 +271,6 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js')
-                    .then(reg => console.log('Service Worker Registered!'))
                     .catch(err => console.error('Service Worker Error', err));
             });
         }

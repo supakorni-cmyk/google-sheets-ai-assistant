@@ -18,7 +18,7 @@ export default async (req: Request, context: Context) => {
     if (url.searchParams.get("action") === "getSheetData") {
         const sheetData = await sheets.spreadsheets.values.get({
             spreadsheetId: spreadsheetId,
-            range: 'Sheet1!A:B', 
+            range: 'Sheet1!A:D', 
         });
         
         return new Response(JSON.stringify(sheetData.data.values || []), {

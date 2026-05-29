@@ -3,10 +3,8 @@ import { messagingApi, webhook } from '@line/bot-sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { google } from 'googleapis';
 
-// 1. Initialize BOTH LINE Clients (Text Client and Blob Client)
 const lineClient = new messagingApi.MessagingApiClient({ channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '' });
 const blobClient = new messagingApi.MessagingApiBlobClient({ channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN || '' });
-
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
 const sheetsAuth = new google.auth.JWT({
@@ -35,11 +33,7 @@ export default async (req: Request, context: Context) => {
                 } 
                 else if (event.message.type === 'audio') {
                     isVoice = true;
-                    
-                    // Fetch the audio stream using the BLOB client
                     const stream = await blobClient.getMessageContent(event.message.id);
-                    
-                    // Convert stream to Base64
                     const buffer = await new Promise<Buffer>((resolve, reject) => {
                         const chunks: any[] = [];
                         stream.on('data', (chunk: any) => chunks.push(chunk));
@@ -48,25 +42,20 @@ export default async (req: Request, context: Context) => {
                     });
                     const base64Audio = buffer.toString('base64');
 
-                    // Send to Gemini to transcribe
                     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-                    const prompt = "Transcribe this audio. If the user is giving a task, return EXACTLY the phrase 'add task: ' followed by the task and deadline (e.g., 'add task: buy groceries by tomorrow'). Otherwise, just return the transcription.";
+                    const prompt = "Transcribe this audio. If giving a task, return EXACTLY 'add task: [task] by [deadline]'. If logging an expense, return EXACTLY 'spent: [amount] on [item]'. Otherwise just transcribe it.";
                     
-                    const result = await model.generateContent([
-                        prompt,
-                        { inlineData: { data: base64Audio, mimeType: "audio/mp4" } }
-                    ]);
-                    
+                    const result = await model.generateContent([ prompt, { inlineData: { data: base64Audio, mimeType: "audio/mp4" } } ]);
                     userMessage = result.response.text().trim();
                 }
             }
 
-            // --- 2. PROCESS THE MESSAGE (Text or Transcribed Audio) ---
+            // --- 2. PROCESS COMMANDS ---
             if (userMessage) {
-                // Cast the event to a MessageEvent so TypeScript knows replyToken exists
                 const messageEvent = event as webhook.MessageEvent;
+                const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
 
-                // If it's a LIFF trigger
+                // COMMAND: OPEN LIFF FORM
                 if (userMessage.toLowerCase().trim() === 'add task') {
                     await lineClient.replyMessage({
                         replyToken: messageEvent.replyToken || '',
@@ -75,7 +64,31 @@ export default async (req: Request, context: Context) => {
                     continue;
                 }
                 
-                // If it's a task creation command
+                // COMMAND: LOG EXPENSE (FINANCES)
+                else if (userMessage.toLowerCase().startsWith('spent:')) {
+                    let rawText = userMessage.substring(6).trim(); // e.g. "150 on coffee"
+                    let amount = 0;
+                    let item = rawText;
+                    
+                    // Simple logic to pull the number and the item
+                    const parts = rawText.split(' ');
+                    if (!isNaN(parseFloat(parts[0]))) {
+                        amount = parseFloat(parts[0]);
+                        item = parts.slice(1).join(' ').replace(/^on /i, '').trim();
+                    }
+
+                    await sheets.spreadsheets.values.append({
+                        spreadsheetId: spreadsheetId, range: 'Finances!A:D', valueInputOption: 'USER_ENTERED',
+                        requestBody: { values: [[now, item, amount, 'Misc']] }
+                    });
+
+                    let replyText = `💸 Logged: ฿${amount} for "${item}"`;
+                    if (isVoice) replyText = `🎙️ Heard: "${userMessage}"\n` + replyText;
+
+                    await lineClient.replyMessage({ replyToken: messageEvent.replyToken || '', messages: [{ type: 'text', text: replyText }] });
+                }
+
+                // COMMAND: ADD TASK
                 else if (userMessage.toLowerCase().startsWith('add task:')) {
                     let rawTask = userMessage.substring(9).trim();
                     let taskName = rawTask;
@@ -86,37 +99,29 @@ export default async (req: Request, context: Context) => {
                         taskName = parts[0].trim();
                         deadline = parts[1].trim();
                     }
-
-                    const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
                     
                     await sheets.spreadsheets.values.append({
-                        spreadsheetId: spreadsheetId, range: 'Tasks!A:D', valueInputOption: 'USER_ENTERED',
-                        requestBody: { values: [[taskName, 'Pending', now, deadline]] }
+                        spreadsheetId: spreadsheetId, range: 'Tasks!A:F', valueInputOption: 'USER_ENTERED',
+                        // Format: [Task, Status, Category, Time, Added, Deadline]
+                        requestBody: { values: [[taskName, 'Pending', '', '', now, deadline]] }
                     });
 
-                    // If it was voice, let them know what the bot heard
                     let replyText = deadline === "-" ? `✅ Added: "${taskName}"` : `✅ Added: "${taskName}"\n⏳ Due: ${deadline}`;
                     if (isVoice) replyText = `🎙️ Heard: "${taskName}"\n` + replyText;
 
-                    await lineClient.replyMessage({ 
-                        replyToken: messageEvent.replyToken || '', 
-                        messages: [{ type: 'text', text: replyText }] 
-                    });
+                    await lineClient.replyMessage({ replyToken: messageEvent.replyToken || '', messages: [{ type: 'text', text: replyText }] });
                 } 
                 
-                // General AI Chat
+                // DEFAULT: AI CHAT
                 else {
-                    const sheetData = await sheets.spreadsheets.values.get({ spreadsheetId: spreadsheetId, range: 'Sheet1!A:D' });
+                    const sheetData = await sheets.spreadsheets.values.get({ spreadsheetId: spreadsheetId, range: 'Tasks!A:F' });
                     const myData = JSON.stringify(sheetData.data.values || "No data");
                     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
                     
                     let replyPrefix = isVoice ? `🎙️ Heard: "${userMessage}"\n\n` : "";
-                    const result = await model.generateContent(`You are my personal assistant. User asked: "${userMessage}". Latest data from Google Sheet: ${myData}. Respond conversationally and concisely.`);
+                    const result = await model.generateContent(`You are my assistant. User asked: "${userMessage}". Latest Tasks: ${myData}. Respond concisely.`);
                     
-                    await lineClient.replyMessage({ 
-                        replyToken: messageEvent.replyToken || '', 
-                        messages: [{ type: 'text', text: replyPrefix + result.response.text() }] 
-                    });
+                    await lineClient.replyMessage({ replyToken: messageEvent.replyToken || '', messages: [{ type: 'text', text: replyPrefix + result.response.text() }] });
                 }
             }
         }

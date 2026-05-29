@@ -2,80 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create Task</title>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
-        :root {
-            --line-green: #06C755;
-            --line-green-hover: #05b34c;
-            --bg: #f5f5f5;
-            --card: #ffffff;
-            --text: #111111;
-        }
-
-        body { 
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            background: var(--bg); 
-            margin: 0; 
-            padding: 1rem; 
-            color: var(--text); 
-        }
-
-        .container { 
-            background: var(--card); 
-            padding: 2rem 1.5rem; 
-            border-radius: 20px; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05); 
-            max-width: 500px; 
-            margin: 0 auto; 
-        }
-
-        h2 { margin-top: 0; font-size: 1.5rem; text-align: center; margin-bottom: 1.5rem; }
-        
-        label { 
-            font-weight: 600; 
-            display: block; 
-            margin-bottom: 0.5rem; 
-            color: #444; 
-            font-size: 0.9rem; 
-        }
-
-        input { 
-            width: 100%; 
-            padding: 1rem; 
-            border: 1px solid #ddd; 
-            border-radius: 12px; 
-            box-sizing: border-box; 
-            font-size: 1rem; 
-            background: #fafafa; 
-            margin-bottom: 1.25rem; 
-            outline: none; 
-            transition: all 0.2s; 
-            -webkit-appearance: none;
-        }
-        input:focus { border-color: var(--line-green); background: #fff; box-shadow: 0 0 0 3px rgba(6, 199, 85, 0.1); }
-
-        button { 
-            width: 100%; 
-            padding: 1rem; 
-            background: var(--line-green); 
-            color: #fff; 
-            border: none; 
-            border-radius: 12px; 
-            font-weight: bold; 
-            font-size: 1.1rem; 
-            cursor: pointer; 
-            transition: background 0.2s; 
-            margin-top: 0.5rem;
-        }
-        button:active { background: var(--line-green-hover); transform: scale(0.98); }
+        body { font-family: system-ui, sans-serif; background: #f4f4f5; padding: 2rem; margin: 0; }
+        .container { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        label { font-weight: bold; display: block; margin-bottom: 0.5rem; margin-top: 1rem; }
+        input { width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 1rem; background: #10a37f; color: #fff; border: none; border-radius: 6px; font-weight: bold; margin-top: 1.5rem; font-size: 1.1rem; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>➕ Add New Task</h2>
+        <h2 style="margin-top: 0;">➕ Add New Task</h2>
         
         <label for="taskInput">Task Name</label>
         <input type="text" id="taskInput" placeholder="Pay the electric bill...">
@@ -87,45 +28,41 @@
     </div>
 
     <script>
-        // Initialize LIFF with your ID
-        liff.init({ liffId: "YOUR_LIFF_ID_HERE" }).catch(err => console.error(err));
+        // 1. Initialize LIFF
+        // Note: You will replace YOUR_LIFF_ID_HERE with the real ID later
+        liff.init({ liffId: "2010230678-8eqN4V5B" }).catch(err => console.error(err));
 
         function submitTask() {
-            const taskInput = document.getElementById('taskInput');
-            const deadlineInput = document.getElementById('deadlineInput');
-            const submitBtn = document.getElementById('submitBtn');
-
-            const task = taskInput.value;
+            const task = document.getElementById('taskInput').value;
+            const deadlineInput = document.getElementById('deadlineInput').value;
+            
             if (!task) {
                 alert("Please enter a task name!");
                 return;
             }
 
-            // Visual feedback while sending
-            submitBtn.innerText = "Saving...";
-            submitBtn.style.opacity = "0.7";
-
+            // 2. Format the message exactly how our Webhook expects it
             let messageText = `Add task: ${task}`;
-            if (deadlineInput.value) {
-                const formattedDate = new Date(deadlineInput.value).toLocaleString("en-US");
+            if (deadlineInput) {
+                // Convert HTML datetime to a readable string
+                const formattedDate = new Date(deadlineInput).toLocaleString("en-US");
                 messageText += ` by ${formattedDate}`;
             }
 
+            // 3. Send the message to the chat on behalf of the user
             if (liff.isLoggedIn() && liff.isInClient()) {
                 liff.sendMessages([{ type: "text", text: messageText }])
                     .then(() => {
+                        // Close the popup window automatically
                         liff.closeWindow();
                     })
                     .catch((err) => {
                         console.error("Error sending message: ", err);
                         alert("Error saving task.");
-                        submitBtn.innerText = "Save Task";
-                        submitBtn.style.opacity = "1";
                     });
             } else {
+                // Fallback if testing in a normal browser
                 alert("This form must be opened inside the LINE app!");
-                submitBtn.innerText = "Save Task";
-                submitBtn.style.opacity = "1";
             }
         }
     </script>

@@ -90,7 +90,7 @@ export default async (req: Request, context: Context) => {
                     const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
                     
                     await sheets.spreadsheets.values.append({
-                        spreadsheetId: spreadsheetId, range: 'Sheet1!A:D', valueInputOption: 'USER_ENTERED',
+                        spreadsheetId: spreadsheetId, range: 'Tasks!A:D', valueInputOption: 'USER_ENTERED',
                         requestBody: { values: [[taskName, 'Pending', now, deadline]] }
                     });
 

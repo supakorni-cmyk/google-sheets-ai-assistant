@@ -3,279 +3,197 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My AI Assistant Dashboard</title>
+    <title>AI Command Center</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --primary: #10a37f;
-            --primary-hover: #0d8a6b;
-            --bg: #f3f4f6;
-            --card-bg: #ffffff;
-            --text: #1f2937;
-            --text-light: #6b7280;
+            --bg: #f3f4f6; --card-bg: #ffffff; --text: #1f2937;
+            --primary: #10a37f; --pending: #f59e0b; --progress: #3b82f6;
             --border: #e5e7eb;
         }
 
-        body { 
-            font-family: 'Inter', system-ui, -apple-system, sans-serif; 
-            background: var(--bg); 
-            color: var(--text); 
-            padding: 1.5rem; 
-            max-width: 900px; 
-            margin: 0 auto; 
-            line-height: 1.5; 
-        }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; margin-bottom: 2rem; color: #111827; }
+        h2 { font-size: 1.25rem; margin-top: 0; margin-bottom: 1rem; }
 
-        h1 { text-align: center; color: #111827; margin-bottom: 2rem; }
-        h2 { margin-top: 0; font-size: 1.25rem; color: #374151; margin-bottom: 1.25rem; }
+        .dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem; align-items: start; }
+        @media (max-width: 768px) { .dashboard-grid { grid-template-columns: 1fr; } }
 
-        .card { 
-            background: var(--card-bg); 
-            padding: 1.5rem 2rem; 
-            border-radius: 16px; 
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03); 
-            margin-bottom: 2rem; 
-            border: 1px solid var(--border); 
-        }
+        .card { background: var(--card-bg); padding: 1.5rem; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); border: 1px solid var(--border); margin-bottom: 1.5rem; }
 
-        /* Task Visualizer Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-        .stat-box {
-            background: var(--card-bg);
-            padding: 1.5rem;
-            border-radius: 16px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
-            border: 1px solid var(--border);
-            text-align: center;
-        }
-        .stat-box h3 { margin: 0; font-size: 1rem; color: var(--text-light); font-weight: 500; }
-        .stat-box p { margin: 0.5rem 0 0; font-size: 2.5rem; font-weight: 700; }
+        /* Kanban Board Styles */
+        .kanban-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+        .kanban-col { background: #f9fafb; border-radius: 12px; padding: 1rem; border: 1px solid var(--border); display: flex; flex-direction: column; }
+        .kanban-header { font-weight: bold; margin-bottom: 1rem; text-align: center; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.05em; color: #4b5563; }
+        .kanban-cards { flex-grow: 1; min-height: 200px; }
         
-        /* Stat Colors */
-        .stat-total p { color: #3b82f6; } /* Blue */
-        .stat-pending p { color: #f59e0b; } /* Orange */
-        .stat-done p { color: #10a37f; } /* Green */
+        /* Task Cards */
+        .task-card { background: white; padding: 1rem; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 0.75rem; cursor: grab; box-shadow: 0 1px 3px rgba(0,0,0,0.1); position: relative; }
+        .task-card:active { cursor: grabbing; }
+        .task-title { font-weight: 600; margin-bottom: 0.5rem; font-size: 0.95rem; }
+        .task-meta { display: flex; gap: 0.5rem; font-size: 0.75rem; color: #6b7280; }
+        .badge { background: #e5e7eb; padding: 2px 6px; border-radius: 4px; }
+        .delete-btn { position: absolute; top: 8px; right: 8px; background: none; border: none; color: #ef4444; cursor: pointer; font-size: 1rem; opacity: 0; transition: opacity 0.2s; }
+        .task-card:hover .delete-btn { opacity: 1; }
 
-        /* Forms & Inputs */
-        .form-group { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 1rem; }
-        input[type="text"], input[type="datetime-local"] { 
-            flex: 1 1 200px; 
-            padding: 0.75rem 1rem; 
-            border: 1px solid var(--border); 
-            border-radius: 8px; 
-            font-size: 1rem; 
-            outline: none; 
-            transition: all 0.2s; 
-        }
-        input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(16, 163, 127, 0.1); }
-        
-        button { 
-            padding: 0.75rem 1.5rem; 
-            background: var(--primary); 
-            color: white; 
-            border: none; 
-            cursor: pointer; 
-            border-radius: 8px; 
-            font-weight: 600; 
-            font-size: 1rem; 
-            transition: all 0.2s; 
-        }
-        button:hover { background: var(--primary-hover); }
-        button:disabled { opacity: 0.7; cursor: not-allowed; }
-
-        /* Responsive Table */
-        .table-responsive { 
-            overflow-x: auto; 
-            -webkit-overflow-scrolling: touch; 
-            border-radius: 8px; 
-            border: 1px solid var(--border); 
-        }
-        table { width: 100%; border-collapse: collapse; white-space: nowrap; }
-        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid var(--border); }
-        th { background: #f9fafb; font-weight: 600; color: #4b5563; }
-        tr:last-child td { border-bottom: none; }
-        tr:hover td { background: #f8fafc; }
-
-        /* Action Buttons */
-        .icon-btn { 
-            padding: 8px; 
-            font-size: 1rem; 
-            border-radius: 6px; 
-            width: 36px; 
-            height: 36px; 
-            display: inline-flex; 
-            align-items: center; 
-            justify-content: center; 
-            border: none;
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
-        .icon-btn:hover { opacity: 0.8; }
-        
-        .ai-response { margin-top: 1rem; padding: 1rem; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; display: none; }
+        /* Finances Styles */
+        .finance-total { font-size: 2.5rem; font-weight: bold; text-align: center; color: var(--text); margin-bottom: 1rem; }
+        .expense-list { margin-top: 1.5rem; font-size: 0.9rem; max-height: 200px; overflow-y: auto; }
+        .expense-item { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
     </style>
 </head>
 <body>
 
     <h1>🚀 My AI Command Center</h1>
 
-    <div class="stats-grid">
-        <div class="stat-box stat-total">
-            <h3>Total Tasks</h3>
-            <p id="countTotal">0</p>
+    <div class="dashboard-grid">
+        
+        <div>
+            <div class="card">
+                <h2>📋 Task Kanban Board</h2>
+                <div class="kanban-board">
+                    <div class="kanban-col" ondrop="drop(event, 'Pending')" ondragover="allowDrop(event)">
+                        <div class="kanban-header" style="color: var(--pending)">⏳ To Do</div>
+                        <div class="kanban-cards" id="col-Pending"></div>
+                    </div>
+                    <div class="kanban-col" ondrop="drop(event, 'In Progress')" ondragover="allowDrop(event)">
+                        <div class="kanban-header" style="color: var(--progress)">🚀 In Progress</div>
+                        <div class="kanban-cards" id="col-In Progress"></div>
+                    </div>
+                    <div class="kanban-col" ondrop="drop(event, 'Done')" ondragover="allowDrop(event)">
+                        <div class="kanban-header" style="color: var(--primary)">✅ Done</div>
+                        <div class="kanban-cards" id="col-Done"></div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="stat-box stat-pending">
-            <h3>Pending</h3>
-            <p id="countPending">0</p>
-        </div>
-        <div class="stat-box stat-done">
-            <h3>Completed</h3>
-            <p id="countDone">0</p>
-        </div>
-    </div>
 
-    <div class="card">
-        <h2>➕ Add New Task</h2>
-        <div class="form-group">
-            <input type="text" id="newTaskInput" placeholder="Pay the electric bill...">
-            <input type="datetime-local" id="deadlineInput">
-            <button onclick="createTask()">Save Task</button>
+        <div>
+            <div class="card">
+                <h2>💸 Monthly Finances</h2>
+                <div class="finance-total" id="financeTotal">฿0</div>
+                <canvas id="expenseChart"></canvas>
+                <div class="expense-list" id="expenseList"></div>
+            </div>
         </div>
-    </div>
 
-    <div class="card">
-        <h2>📊 Active Tasks & Data</h2>
-        <div id="sheetContent">Loading data...</div>
-    </div>
-
-    <div class="card">
-        <h2>🤖 Ask your Assistant</h2>
-        <div class="form-group">
-            <input type="text" id="aiInput" placeholder="Analyze my workload...">
-            <button onclick="askAI()">Ask AI</button>
-        </div>
-        <div id="aiResponse" class="ai-response"></div>
     </div>
 
     <script>
-        async function fetchSheetData() {
-            const response = await fetch('/api?action=getSheetData');
-            const result = await response.json(); 
+        let expenseChartInstance = null;
+
+        async function fetchData() {
+            // 1. Fetch Tasks
+            const tasksRes = await fetch('/api?action=getTasks');
+            const tasks = await tasksRes.json();
+            renderKanban(tasks);
+
+            // 2. Fetch Finances
+            const financesRes = await fetch('/api?action=getFinances');
+            const finances = await financesRes.json();
+            renderFinances(finances);
+        }
+
+        // --- KANBAN LOGIC ---
+        function renderKanban(tasks) {
+            document.getElementById('col-Pending').innerHTML = '';
+            document.getElementById('col-In Progress').innerHTML = '';
+            document.getElementById('col-Done').innerHTML = '';
+
+            tasks.forEach((item, index) => {
+                if (index === 0 || !item.data || item.data.length === 0 || !item.data[0]) return; // Skip headers & empty
+
+                const [name, status, category, time, added, deadline] = item.data;
+                const safeStatus = status === 'Done' ? 'Done' : (status === 'In Progress' ? 'In Progress' : 'Pending');
+
+                const cardHTML = `
+                    <div class="task-card" draggable="true" ondragstart="drag(event)" id="task-${item.rowNumber}">
+                        <button class="delete-btn" onclick="deleteTask(${item.rowNumber})" title="Delete">×</button>
+                        <div class="task-title">${name}</div>
+                        <div class="task-meta">
+                            ${category ? `<span class="badge">${category}</span>` : ''}
+                            ${time ? `<span>⏱️ ${time}</span>` : ''}
+                        </div>
+                        ${deadline && deadline !== '-' ? `<div style="font-size:0.75rem; color:#ef4444; margin-top:6px;">📅 Due: ${new Date(deadline).toLocaleDateString()}</div>` : ''}
+                    </div>
+                `;
+                document.getElementById(`col-${safeStatus}`).insertAdjacentHTML('beforeend', cardHTML);
+            });
+        }
+
+        function allowDrop(ev) { ev.preventDefault(); }
+        function drag(ev) { ev.dataTransfer.setData("rowId", ev.target.id); }
+        async function drop(ev, newStatus) {
+            ev.preventDefault();
+            const rowId = ev.dataTransfer.getData("rowId");
+            const rowNumber = rowId.split('-')[1];
             
-            // Reset counters
-            let totalTasks = 0;
-            let pendingTasks = 0;
-            let doneTasks = 0;
-            
-            if (result.length <= 1) {
-                document.getElementById('sheetContent').innerHTML = "<p style='color: var(--text-light);'>No tasks found.</p>";
-                updateStats(0, 0, 0);
-                return;
+            // Instantly move the UI for snappy feel
+            const dropTarget = ev.target.closest('.kanban-col').querySelector('.kanban-cards');
+            dropTarget.appendChild(document.getElementById(rowId));
+
+            // Tell the backend to update Google Sheets
+            await fetch('/api?action=updateTaskStatus', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ rowNumber: rowNumber, status: newStatus })
+            });
+        }
+
+        async function deleteTask(rowNumber) {
+            if(!confirm("Delete this task?")) return;
+            document.getElementById(`task-${rowNumber}`).remove(); // UI remove immediately
+            await fetch('/api?action=deleteTask', { method: 'POST', body: JSON.stringify({ rowNumber }) });
+        }
+
+        // --- FINANCE LOGIC ---
+        function renderFinances(finances) {
+            if (finances.length <= 1) return;
+
+            let totalSpent = 0;
+            const categories = {};
+            let listHTML = '';
+
+            // Skip header row (index 0)
+            for(let i = finances.length - 1; i > 0; i--) {
+                const [date, item, amountStr, cat] = finances[i];
+                if (!item) continue;
+
+                const amount = parseFloat(amountStr) || 0;
+                totalSpent += amount;
+
+                const category = cat || 'Misc';
+                categories[category] = (categories[category] || 0) + amount;
+
+                // Add to recent list (limit to 5)
+                if (finances.length - i <= 5) {
+                    listHTML += `<div class="expense-item"><span>${item} <small style="color:#6b7280">(${category})</small></span> <strong>฿${amount.toFixed(2)}</strong></div>`;
+                }
             }
 
-            let html = '<div class="table-responsive"><table>';
-            result.forEach((item, index) => {
-                if (item.data.length === 0 || !item.data[0]) return;
+            document.getElementById('financeTotal').innerText = `฿${totalSpent.toLocaleString()}`;
+            document.getElementById('expenseList').innerHTML = listHTML;
 
-                // Tally the stats (Skip index 0 because it is the Header row)
-                if (index > 0) {
-                    totalTasks++;
-                    if (item.data[1] === 'Done') {
-                        doneTasks++;
-                    } else {
-                        pendingTasks++;
-                    }
-                }
-
-                html += '<tr>';
-                item.data.forEach(cell => {
-                    html += index === 0 ? `<th>${cell}</th>` : `<td>${cell}</td>`;
-                });
-                
-                if (index === 0) {
-                    html += '<th>Actions</th>';
-                } else {
-                    const status = item.data[1]; 
-                    
-                    const statusBtn = status !== 'Done' 
-                        ? `<button class="icon-btn" onclick="updateStatus(${item.rowNumber}, 'Done')" style="background:#10a37f; color:white;" title="Mark Done">✅</button>` 
-                        : `<button class="icon-btn" onclick="updateStatus(${item.rowNumber}, 'Pending')" style="background:#f59e0b; color:white;" title="Mark Pending">⏳</button>`;
-                    
-                    const editBtn = `<button class="icon-btn" onclick="editTask(${item.rowNumber}, '${item.data[0].replace(/'/g, "\\'")}')" style="background:#3b82f6; color:white;" title="Edit Name">✏️</button>`;
-                    const deleteBtn = `<button class="icon-btn" onclick="deleteTask(${item.rowNumber})" style="background:#ef4444; color:white;" title="Delete Task">🗑️</button>`;
-                    
-                    html += `<td><div style="display:flex; gap:6px;">${statusBtn} ${editBtn} ${deleteBtn}</div></td>`;
-                }
-                html += '</tr>';
+            // Render Chart.js
+            const ctx = document.getElementById('expenseChart').getContext('2d');
+            if(expenseChartInstance) expenseChartInstance.destroy();
+            
+            expenseChartInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(categories),
+                    datasets: [{
+                        data: Object.values(categories),
+                        backgroundColor: ['#10a37f', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'],
+                        borderWidth: 0
+                    }]
+                },
+                options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
             });
-            html += '</table></div>';
-            document.getElementById('sheetContent').innerHTML = html;
-            
-            // Update the UI numbers
-            updateStats(totalTasks, pendingTasks, doneTasks);
         }
 
-        // Helper function to update the numbers on the screen
-        function updateStats(total, pending, done) {
-            document.getElementById('countTotal').innerText = total;
-            document.getElementById('countPending').innerText = pending;
-            document.getElementById('countDone').innerText = done;
-        }
-
-        async function updateStatus(rowNum, newStatus) {
-            await fetch('/api?action=updateStatus', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rowNumber: rowNum, status: newStatus }) });
-            fetchSheetData();
-        }
-
-        async function editTask(rowNum, currentName) {
-            const newName = prompt("Edit Task Name:", currentName);
-            if (!newName || newName === currentName) return; 
-            await fetch('/api?action=editTask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rowNumber: rowNum, newName: newName }) });
-            fetchSheetData(); 
-        }
-
-        async function deleteTask(rowNum) {
-            if(!confirm("Are you sure you want to delete this task?")) return;
-            await fetch('/api?action=deleteTask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rowNumber: rowNum }) });
-            fetchSheetData(); 
-        }
-
-        async function createTask() {
-            const taskInput = document.getElementById('newTaskInput');
-            const deadlineInput = document.getElementById('deadlineInput');
-            const taskText = taskInput.value;
-            const deadlineDate = deadlineInput.value ? new Date(deadlineInput.value).toLocaleString() : "-";
-            if (!taskText) return;
-
-            taskInput.value = 'Saving...';
-            taskInput.disabled = true;
-
-            await fetch('/api?action=createTask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ task: taskText, deadline: deadlineDate }) });
-
-            taskInput.value = '';
-            deadlineInput.value = '';
-            taskInput.disabled = false;
-            fetchSheetData(); 
-        }
-
-        async function askAI() {
-            const question = document.getElementById('aiInput').value;
-            if (!question) return;
-            
-            const responseBox = document.getElementById('aiResponse');
-            responseBox.style.display = 'block';
-            responseBox.innerHTML = "<em>Thinking... 🤔</em>";
-
-            const response = await fetch('/api?action=askAI', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question }) });
-            const data = await response.json();
-            responseBox.innerHTML = `<strong>Assistant:</strong><br/> ${data.answer.replace(/\n/g, '<br/>')}`;
-        }
-
-        fetchSheetData();
+        // Load dashboard
+        fetchData();
     </script>
 </body>
 </html>

@@ -37,6 +37,29 @@
             border: 1px solid var(--border); 
         }
 
+        /* Task Visualizer Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .stat-box {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+        .stat-box h3 { margin: 0; font-size: 1rem; color: var(--text-light); font-weight: 500; }
+        .stat-box p { margin: 0.5rem 0 0; font-size: 2.5rem; font-weight: 700; }
+        
+        /* Stat Colors */
+        .stat-total p { color: #3b82f6; } /* Blue */
+        .stat-pending p { color: #f59e0b; } /* Orange */
+        .stat-done p { color: #10a37f; } /* Green */
+
         /* Forms & Inputs */
         .form-group { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 1rem; }
         input[type="text"], input[type="datetime-local"] { 
@@ -100,6 +123,21 @@
 
     <h1>🚀 My AI Command Center</h1>
 
+    <div class="stats-grid">
+        <div class="stat-box stat-total">
+            <h3>Total Tasks</h3>
+            <p id="countTotal">0</p>
+        </div>
+        <div class="stat-box stat-pending">
+            <h3>Pending</h3>
+            <p id="countPending">0</p>
+        </div>
+        <div class="stat-box stat-done">
+            <h3>Completed</h3>
+            <p id="countDone">0</p>
+        </div>
+    </div>
+
     <div class="card">
         <h2>➕ Add New Task</h2>
         <div class="form-group">
@@ -128,14 +166,30 @@
             const response = await fetch('/api?action=getSheetData');
             const result = await response.json(); 
             
+            // Reset counters
+            let totalTasks = 0;
+            let pendingTasks = 0;
+            let doneTasks = 0;
+            
             if (result.length <= 1) {
                 document.getElementById('sheetContent').innerHTML = "<p style='color: var(--text-light);'>No tasks found.</p>";
+                updateStats(0, 0, 0);
                 return;
             }
 
             let html = '<div class="table-responsive"><table>';
             result.forEach((item, index) => {
                 if (item.data.length === 0 || !item.data[0]) return;
+
+                // Tally the stats (Skip index 0 because it is the Header row)
+                if (index > 0) {
+                    totalTasks++;
+                    if (item.data[1] === 'Done') {
+                        doneTasks++;
+                    } else {
+                        pendingTasks++;
+                    }
+                }
 
                 html += '<tr>';
                 item.data.forEach(cell => {
@@ -160,6 +214,16 @@
             });
             html += '</table></div>';
             document.getElementById('sheetContent').innerHTML = html;
+            
+            // Update the UI numbers
+            updateStats(totalTasks, pendingTasks, doneTasks);
+        }
+
+        // Helper function to update the numbers on the screen
+        function updateStats(total, pending, done) {
+            document.getElementById('countTotal').innerText = total;
+            document.getElementById('countPending').innerText = pending;
+            document.getElementById('countDone').innerText = done;
         }
 
         async function updateStatus(rowNum, newStatus) {

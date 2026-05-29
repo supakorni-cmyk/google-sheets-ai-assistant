@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Task</title>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #f4f4f5; padding: 2rem; margin: 0; }
+        .container { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        label { font-weight: bold; display: block; margin-bottom: 0.5rem; margin-top: 1rem; }
+        input { width: 100%; padding: 0.75rem; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 1rem; background: #10a37f; color: #fff; border: none; border-radius: 6px; font-weight: bold; margin-top: 1.5rem; font-size: 1.1rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2 style="margin-top: 0;">➕ Add New Task</h2>
+        
+        <label for="taskInput">Task Name</label>
+        <input type="text" id="taskInput" placeholder="Pay the electric bill...">
+
+        <label for="deadlineInput">Deadline (Optional)</label>
+        <input type="datetime-local" id="deadlineInput">
+
+        <button onclick="submitTask()" id="submitBtn">Save Task</button>
+    </div>
+
+    <script>
+        // 1. Initialize LIFF
+        // Note: You will replace YOUR_LIFF_ID_HERE with the real ID later
+        liff.init({ liffId: "2010230678-8eqN4V5B" }).catch(err => console.error(err));
+
+        function submitTask() {
+            const task = document.getElementById('taskInput').value;
+            const deadlineInput = document.getElementById('deadlineInput').value;
+            
+            if (!task) {
+                alert("Please enter a task name!");
+                return;
+            }
+
+            // 2. Format the message exactly how our Webhook expects it
+            let messageText = `Add task: ${task}`;
+            if (deadlineInput) {
+                // Convert HTML datetime to a readable string
+                const formattedDate = new Date(deadlineInput).toLocaleString("en-US");
+                messageText += ` by ${formattedDate}`;
+            }
+
+            // 3. Send the message to the chat on behalf of the user
+            if (liff.isLoggedIn() && liff.isInClient()) {
+                liff.sendMessages([{ type: "text", text: messageText }])
+                    .then(() => {
+                        // Close the popup window automatically
+                        liff.closeWindow();
+                    })
+                    .catch((err) => {
+                        console.error("Error sending message: ", err);
+                        alert("Error saving task.");
+                    });
+            } else {
+                // Fallback if testing in a normal browser
+                alert("This form must be opened inside the LINE app!");
+            }
+        }
+    </script>
+</body>
+</html>

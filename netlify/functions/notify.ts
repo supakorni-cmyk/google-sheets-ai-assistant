@@ -10,7 +10,7 @@ export default async (req: Request) => {
     try {
         const sheetData = await sheets.spreadsheets.values.get({
             spreadsheetId: process.env.GOOGLE_SHEET_ID || '',
-            range: 'Sheet1!A2:D', 
+            range: 'Tasks!A2:D', 
         });
         
         const rows = sheetData.data.values || [];

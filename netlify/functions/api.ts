@@ -26,13 +26,18 @@ export default async (req: Request, context: Context) => {
         });
     }
 
-    if (url.searchParams.get("action") === "createTask" && req.method === "POST") {
+   if (url.searchParams.get("action") === "createTask" && req.method === "POST") {
         const body = await req.json();
+        
+        // Get the current time in Thailand
+        const now = new Date().toLocaleString("en-US", { timeZone: "Asia/Bangkok" });
+        const deadline = body.deadline || "-";
+
         await sheets.spreadsheets.values.append({
             spreadsheetId: spreadsheetId,
-            range: 'Sheet1!A:B',
+            range: 'Sheet1!A:D', // Expanded range to cover Columns A through D
             valueInputOption: 'USER_ENTERED',
-            requestBody: { values: [[body.task, 'Pending']] }
+            requestBody: { values: [[body.task, 'Pending', now, deadline]] }
         });
         
         return new Response(JSON.stringify({ success: true }), {

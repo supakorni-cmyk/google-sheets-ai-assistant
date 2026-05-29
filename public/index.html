@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Assistant Dashboard</title>
+    <style>
+        body { font-family: system-ui, sans-serif; background: #f4f4f5; padding: 2rem; max-width: 800px; margin: 0 auto; }
+        .card { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+        input { width: 70%; padding: 0.5rem; }
+        button { padding: 0.5rem 1rem; background: #10a37f; color: #fff; border: none; cursor: pointer; border-radius: 4px;}
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        td, th { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    </style>
+</head>
+<body>
+
+    <h1>🚀 My AI Command Center</h1>
+
+    <div class="card">
+        <h2>📊 Latest Google Sheets Data</h2>
+        <div id="sheetContent">Loading data...</div>
+    </div>
+
+    <div class="card">
+        <h2>🤖 Ask your Assistant</h2>
+        <input type="text" id="aiInput" placeholder="Analyze my expenses...">
+        <button onclick="askAI()">Ask AI</button>
+        <p id="aiResponse"></p>
+    </div>
+
+    <script>
+        async function fetchSheetData() {
+            const response = await fetch('/api?action=getSheetData');
+            const data = await response.json();
+            
+            let html = '<table>';
+            data.forEach((row, index) => {
+                html += '<tr>';
+                row.forEach(cell => {
+                    html += index === 0 ? `<th>${cell}</th>` : `<td>${cell}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</table>';
+            document.getElementById('sheetContent').innerHTML = html;
+        }
+
+        async function askAI() {
+            const question = document.getElementById('aiInput').value;
+            const responseText = document.getElementById('aiResponse');
+            responseText.innerHTML = "<em>Analyzing...</em>";
+
+            const response = await fetch('/api?action=askAI', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ question })
+            });
+            
+            const data = await response.json();
+            responseText.innerHTML = `<strong>Assistant:</strong> ${data.answer}`;
+        }
+
+        fetchSheetData();
+    </script>
+</body>
+</html>

@@ -263,6 +263,29 @@
             });
         }
 
+        // --- AUTO LIVE-SYNC LOGIC ---
+        
+        let isDragging = false;
+
+        // 1. Protect the UI from refreshing while you are holding a card
+        document.addEventListener('dragstart', () => isDragging = true);
+        document.addEventListener('dragend', () => isDragging = false);
+        document.addEventListener('drop', () => isDragging = false);
+
+        // 2. Auto-fetch every 10 seconds (if not dragging)
+        setInterval(() => {
+            if (!isDragging) {
+                fetchData();
+            }
+        }, 10000); // 10000 milliseconds = 10 seconds
+
+        // 3. Instant fetch when you bring the app back to the screen
+        document.addEventListener("visibilitychange", () => {
+            if (document.visibilityState === "visible") {
+                fetchData();
+            }
+        });
+
         // Load dashboard
         fetchData();
     </script>
